@@ -3,6 +3,7 @@ import { db, isLocalDB } from '@/db';
 import { stalls, reviews } from '@/db/schema';
 import { eq, desc, gte, and, sql } from 'drizzle-orm';
 import { withRetry } from '@/lib/retry';
+import { serializeForJson } from '@/lib/db-utils';
 
 function calculateStallScore(
   avgRating: number,
@@ -134,7 +135,7 @@ app.get('/stalls/ranked', async (c) => {
 
   return c.json({
     success: true,
-    data: rankedStalls,
+    data: serializeForJson(rankedStalls),
   });
 });
 
