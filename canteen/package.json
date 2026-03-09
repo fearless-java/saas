@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "DB_PROVIDER=local bun dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,12 +12,17 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:seed:local": "DB_PROVIDER=local tsx src/db/seed.ts",
+    "db:studio": "drizzle-kit studio",
+    "db:sync": "tsx src/db/sync.ts",
+    "db:export": "tsx src/db/sync.ts export",
+    "db:migrate-to-local": "DB_PROVIDER=neon tsx src/db/sync.ts migrate to-local"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
     "@tanstack/react-query": "^5.90.21",
     "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.6.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -38,6 +44,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^3.0.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
