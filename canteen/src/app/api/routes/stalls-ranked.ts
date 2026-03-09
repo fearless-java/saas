@@ -1,7 +1,7 @@
 import { app } from '@/lib/hono';
-import { db, isLocalDB } from '@/db';
-import { stalls, reviews } from '@/db/schema';
-import { eq, desc, gte, and, sql } from 'drizzle-orm';
+import { db } from '@/db';
+import { stalls } from '@/db/schema';
+import { eq, desc } from 'drizzle-orm';
 import { withRetry } from '@/lib/retry';
 import { serializeForJson } from '@/lib/db-utils';
 
@@ -25,70 +25,6 @@ function calculateStallScore(
   return ratingScore * reviewWeight * viewWeight;
 }
 
-function toDbDate(date: Date): Date | number {
-  return isLocalDB ? date.getTime() : date;
-}
-
-async function getRatingChanges(): Promise<Map<string, number>> {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
-  const yesterdayEnd = new Date(todayStart);
-
-  const allStalls = await withRetry(() => db.query.stalls.findMany());
-
-  const todayReviewsData = await withRetry(() =>
-    db.query.reviews.findMany({
-      where: gte(reviews.createdAt, toDbDate(todayStart)),
-    })
-  );
-
-  const yesterdayReviewsData = await withRetry(() =>
-    db.query.reviews.findMany({
-      where: and(
-        gte(reviews.createdAt, toDbDate(yesterdayStart)),
-        sql`${reviews.createdAt} < ${toDbDate(yesterdayEnd)}`
-      ),
-    })
-  );
-
-  const ratingChanges = new Map<string, number>();
-
-  for (const stall of allStalls) {
-    const stallTodayReviews = todayReviewsData.filter((r: any) => r.stallId === stall.id);
-    const stallYesterdayReviews = yesterdayReviewsData.filter(
-      (r: any) => r.stallId === stall.id
-    );
-
-    const todayAvg =
-      stallTodayReviews.length > 0
-        ? stallTodayReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / stallTodayReviews.length
-        : 0;
-
-    const yesterdayAvg =
-      stallYesterdayReviews.length > 0
-        ? stallYesterdayReviews.reduce((sum: number, r: any) => sum + r.rating, 0) /
-          stallYesterdayReviews.length
-        : 0;
-
-    let change = 0;
-    if (todayAvg > 0 && yesterdayAvg > 0) {
-      change = Number((todayAvg - yesterdayAvg).toFixed(1));
-    } else if (todayAvg > 0) {
-      change = Number(todayAvg.toFixed(1));
-    } else if (yesterdayAvg > 0) {
-      change = 0;
-    }
-
-    ratingChanges.set(stall.id, change);
-  }
-
-  return ratingChanges;
-}
-
 app.get('/stalls/ranked', async (c) => {
   const cafeteriaId = c.req.query('cafeteriaId');
 
@@ -97,6 +33,7 @@ app.get('/stalls/ranked', async (c) => {
   const allStalls = await withRetry(() =>
     db.query.stalls.findMany({
       where,
+      orderBy: desc(stalls.totalReviews),
       with: {
         cafeteria: true,
         merchant: {
@@ -110,28 +47,22 @@ app.get('/stalls/ranked', async (c) => {
     })
   );
 
-  const ratingChanges = await getRatingChanges();
-
   const rankedStalls = (allStalls as any[])
-    .map((stall) => {
+    .map((stall, index) => {
       const score = calculateStallScore(
         parseFloat(stall.avgRating),
         stall.totalReviews,
         stall.totalViews
       );
-      const ratingChange = ratingChanges.get(stall.id) || 0;
 
       return {
         ...stall,
         score,
-        ratingChange,
+        rank: index + 1,
+        ratingChange: 0,
       };
     })
-    .sort((a, b) => b.score - a.score)
-    .map((stall, index) => ({
-      ...stall,
-      rank: index + 1,
-    }));
+    .sort((a, b) => b.score - a.score);
 
   return c.json({
     success: true,
