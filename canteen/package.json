@@ -12,11 +12,13 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
-    "db:seed:local": "DB_PROVIDER=local tsx src/db/seed.ts",
+    "db:seed:local": "DB_PROVIDER=local tsx src/db/seed-local.ts",
     "db:studio": "drizzle-kit studio",
     "db:sync": "tsx src/db/sync.ts",
     "db:export": "tsx src/db/sync.ts export",
-    "db:migrate-to-local": "DB_PROVIDER=neon tsx src/db/sync.ts migrate to-local"
+    "db:migrate-to-local": "DB_PROVIDER=neon tsx src/db/sync.ts migrate to-local",
+    "db:init:local": "tsx src/db/init-local.ts",
+    "test:db:local": "DB_PROVIDER=local tsx src/db/test-local.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -63,6 +65,7 @@
     "unrs-resolver"
   ],
   "trustedDependencies": [
+    "better-sqlite3",
     "sharp",
     "unrs-resolver"
   ]
