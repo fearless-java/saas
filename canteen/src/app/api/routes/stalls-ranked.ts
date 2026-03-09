@@ -1,5 +1,5 @@
 import { app } from '@/lib/hono';
-import { db } from '@/db';
+import { db, isLocalDB } from '@/db';
 import { stalls, reviews } from '@/db/schema';
 import { eq, desc, gte, and, sql } from 'drizzle-orm';
 import { withRetry } from '@/lib/retry';
@@ -24,6 +24,10 @@ function calculateStallScore(
   return ratingScore * reviewWeight * viewWeight;
 }
 
+function toDbDate(date: Date): Date | number {
+  return isLocalDB ? date.getTime() : date;
+}
+
 async function getRatingChanges(): Promise<Map<string, number>> {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -37,15 +41,15 @@ async function getRatingChanges(): Promise<Map<string, number>> {
 
   const todayReviewsData = await withRetry(() =>
     db.query.reviews.findMany({
-      where: gte(reviews.createdAt, todayStart),
+      where: gte(reviews.createdAt, toDbDate(todayStart)),
     })
   );
 
   const yesterdayReviewsData = await withRetry(() =>
     db.query.reviews.findMany({
       where: and(
-        gte(reviews.createdAt, yesterdayStart),
-        sql`${reviews.createdAt} < ${yesterdayEnd}`
+        gte(reviews.createdAt, toDbDate(yesterdayStart)),
+        sql`${reviews.createdAt} < ${toDbDate(yesterdayEnd)}`
       ),
     })
   );
@@ -53,19 +57,19 @@ async function getRatingChanges(): Promise<Map<string, number>> {
   const ratingChanges = new Map<string, number>();
 
   for (const stall of allStalls) {
-    const stallTodayReviews = todayReviewsData.filter((r) => r.stallId === stall.id);
+    const stallTodayReviews = todayReviewsData.filter((r: any) => r.stallId === stall.id);
     const stallYesterdayReviews = yesterdayReviewsData.filter(
-      (r) => r.stallId === stall.id
+      (r: any) => r.stallId === stall.id
     );
 
     const todayAvg =
       stallTodayReviews.length > 0
-        ? stallTodayReviews.reduce((sum, r) => sum + r.rating, 0) / stallTodayReviews.length
+        ? stallTodayReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / stallTodayReviews.length
         : 0;
 
     const yesterdayAvg =
       stallYesterdayReviews.length > 0
-        ? stallYesterdayReviews.reduce((sum, r) => sum + r.rating, 0) /
+        ? stallYesterdayReviews.reduce((sum: number, r: any) => sum + r.rating, 0) /
           stallYesterdayReviews.length
         : 0;
 
@@ -107,7 +111,7 @@ app.get('/stalls/ranked', async (c) => {
 
   const ratingChanges = await getRatingChanges();
 
-  const rankedStalls = allStalls
+  const rankedStalls = (allStalls as any[])
     .map((stall) => {
       const score = calculateStallScore(
         parseFloat(stall.avgRating),
