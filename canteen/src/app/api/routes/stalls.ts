@@ -5,6 +5,7 @@ import { eq, desc, and, gte } from 'drizzle-orm';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { withRetry } from '@/lib/retry';
+import { serializeForJson } from '@/lib/db-utils';
 
 app.get('/stalls', async (c) => {
   const cafeteriaId = c.req.query('cafeteriaId');
@@ -28,7 +29,7 @@ app.get('/stalls', async (c) => {
     })
   );
 
-  return c.json({ success: true, data });
+  return c.json({ success: true, data: serializeForJson(data) });
 });
 
 app.get('/stalls/:id', async (c) => {
@@ -73,10 +74,10 @@ app.get('/stalls/:id', async (c) => {
 
   return c.json({
     success: true,
-    data: {
+    data: serializeForJson({
       ...stall,
       recentReviews,
-    },
+    }),
   });
 });
 
@@ -115,7 +116,7 @@ app.put('/stalls/:id', async (c) => {
     .where(eq(stalls.id, id))
     .returning();
 
-  return c.json({ success: true, data: updated });
+  return c.json({ success: true, data: serializeForJson(updated) });
 });
 
 app.get('/stalls/:id/stats', async (c) => {
@@ -155,13 +156,13 @@ app.get('/stalls/:id/stats', async (c) => {
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
 
-    const dayReviews = recentReviews.filter((r) =>
-      r.createdAt.toISOString().startsWith(dateStr)
+    const dayReviews = recentReviews.filter((r: any) =>
+      new Date(r.createdAt).toISOString().startsWith(dateStr)
     );
 
     const avgRating =
       dayReviews.length > 0
-        ? dayReviews.reduce((sum, r) => sum + r.rating, 0) / dayReviews.length
+        ? dayReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / dayReviews.length
         : 0;
 
     ratingTrend.push({
@@ -201,12 +202,12 @@ app.get('/stalls/:id/stats', async (c) => {
 
   return c.json({
     success: true,
-    data: {
+    data: serializeForJson({
       totalViews: stall.totalViews,
       totalReviews: stall.totalReviews,
       avgRating: Number(stall.avgRating),
       ratingTrend,
       dishStats,
-    },
+    }),
   });
 });
