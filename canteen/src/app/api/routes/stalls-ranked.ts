@@ -31,7 +31,7 @@ app.get('/stalls/ranked', async (c) => {
   const where = cafeteriaId ? eq(stalls.cafeteriaId, cafeteriaId) : undefined;
 
   const allStalls = await withRetry(() =>
-    db.query.stalls.findMany({
+    (db as any).query.stalls.findMany({
       where,
       orderBy: desc(stalls.totalReviews),
       with: {

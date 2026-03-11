@@ -2,10 +2,11 @@ import { app } from '@/lib/hono';
 import { writeFile } from 'fs/promises';
 import { mkdir } from 'fs/promises';
 import path from 'path';
+import { cwd } from 'process';
 import { auth } from '@/lib/auth';
 import './uploads';
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(cwd(), 'uploads');
 
 app.post('/upload/image', async (c) => {
   const session = await auth();
@@ -43,7 +44,7 @@ app.post('/upload/image', async (c) => {
     return c.json({
       success: true,
       data: {
-        url: `/api/uploads/${filename}`,
+        url: `/uploads/${filename}`,
         filename,
       },
     });

@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
-import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
-import { drizzle as drizzleBetterSqlite3 } from 'drizzle-orm/better-sqlite3';
+import { drizzle as drizzleNeon, NeonHttpDatabase } from 'drizzle-orm/neon-http';
+import { drizzle as drizzleBetterSqlite3, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
 import * as pgSchema from './schema';
 import * as sqliteSchema from './schema.sqlite';
@@ -37,7 +37,9 @@ function createSQLiteConnection() {
   return drizzleBetterSqlite3(sqlite, { schema: sqliteSchema });
 }
 
-export const db = isLocalDB 
+type DatabaseType = NeonHttpDatabase<typeof pgSchema> | BetterSQLite3Database<typeof sqliteSchema>;
+
+export const db: DatabaseType = isLocalDB 
   ? createSQLiteConnection() 
   : createNeonConnection();
 

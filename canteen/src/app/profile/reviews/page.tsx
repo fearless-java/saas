@@ -38,6 +38,11 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 function ReviewItem({ review, index }: { review: Review; index: number }) {
+  // Handle SQLite JSON string vs PostgreSQL array
+  const images = typeof review.images === 'string' 
+    ? JSON.parse(review.images) 
+    : review.images || [];
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -60,9 +65,9 @@ function ReviewItem({ review, index }: { review: Review; index: number }) {
           
           <p className="text-[15px] text-black leading-relaxed mb-3">{review.content}</p>
           
-          {review.images?.length > 0 && (
+          {images.length > 0 && (
             <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-3">
-              {review.images.map((image, i) => (
+              {images.map((image: string, i: number) => (
                 <div key={i} className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100">
                   <img src={image} alt={`图片${i + 1}`} className="w-full h-full object-cover" />
                 </div>

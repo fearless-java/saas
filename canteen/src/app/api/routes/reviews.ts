@@ -1,10 +1,14 @@
 import { app } from '@/lib/hono';
-import { db } from '@/db';
+import { db, isLocalDB } from '@/db';
 import { reviews, stalls, dishes, reviewLikes } from '@/db/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { withRetry } from '@/lib/retry';
+
+function generateUUID() {
+  return crypto.randomUUID();
+}
 
 app.get('/reviews', async (c) => {
   const stallId = c.req.query('stallId');
@@ -14,7 +18,7 @@ app.get('/reviews', async (c) => {
   }
 
   const data = await withRetry(() =>
-    db.query.reviews.findMany({
+    (db as any).query.reviews.findMany({
       where: eq(reviews.stallId, stallId),
       orderBy: desc(reviews.createdAt),
       with: {
@@ -63,50 +67,53 @@ app.post('/reviews', async (c) => {
 
   const data = result.data;
 
-  const [review] = await db
+  const [review] = await (db as any)
     .insert(reviews)
     .values({
+      id: generateUUID(),
       studentId: session.user.id,
       stallId: data.stallId,
       dishId: data.dishId,
       rating: data.rating,
       content: data.content,
       images: data.images,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     })
     .returning();
 
   const stallReviews = await withRetry(() =>
-    db.query.reviews.findMany({
+    (db as any).query.reviews.findMany({
       where: eq(reviews.stallId, data.stallId),
     })
   );
 
   const avgRating =
-    stallReviews.reduce((sum, r) => sum + r.rating, 0) / stallReviews.length;
+    (stallReviews as any[]).reduce((sum: number, r: any) => sum + r.rating, 0) / (stallReviews as any[]).length;
 
-  await db
+  await (db as any)
     .update(stalls)
     .set({
       avgRating: avgRating.toFixed(1),
-      totalReviews: stallReviews.length,
+      totalReviews: (stallReviews as any[]).length,
     })
     .where(eq(stalls.id, data.stallId));
 
   if (data.dishId) {
     const dishReviews = await withRetry(() =>
-      db.query.reviews.findMany({
+      (db as any).query.reviews.findMany({
         where: eq(reviews.dishId, data.dishId!),
       })
     );
 
     const dishAvgRating =
-      dishReviews.reduce((sum, r) => sum + r.rating, 0) / dishReviews.length;
+      (dishReviews as any[]).reduce((sum: number, r: any) => sum + r.rating, 0) / (dishReviews as any[]).length;
 
-    await db
+    await (db as any)
       .update(dishes)
       .set({
         avgRating: dishAvgRating.toFixed(1),
-        totalReviews: dishReviews.length,
+        totalReviews: (dishReviews as any[]).length,
       })
       .where(eq(dishes.id, data.dishId));
   }
@@ -125,7 +132,7 @@ app.post('/reviews/:id/like', async (c) => {
   const studentId = session.user.id;
 
   const existingLike = await withRetry(() =>
-    db.query.reviewLikes.findFirst({
+    (db as any).query.reviewLikes.findFirst({
       where: and(
         eq(reviewLikes.reviewId, reviewId),
         eq(reviewLikes.studentId, studentId)
@@ -134,7 +141,7 @@ app.post('/reviews/:id/like', async (c) => {
   );
 
   if (existingLike) {
-    await db
+    await (db as any)
       .delete(reviewLikes)
       .where(
         and(
@@ -143,19 +150,19 @@ app.post('/reviews/:id/like', async (c) => {
         )
       );
 
-    await db
+    await (db as any)
       .update(reviews)
       .set({ likes: sql`${reviews.likes} - 1` })
       .where(eq(reviews.id, reviewId));
 
     return c.json({ success: true, liked: false });
   } else {
-    await db.insert(reviewLikes).values({
+    await (db as any).insert(reviewLikes).values({
       reviewId,
       studentId,
     });
 
-    await db
+    await (db as any)
       .update(reviews)
       .set({ likes: sql`${reviews.likes} + 1` })
       .where(eq(reviews.id, reviewId));
@@ -172,7 +179,7 @@ app.get('/reviews/my', async (c) => {
   }
 
   const data = await withRetry(() =>
-    db.query.reviews.findMany({
+    (db as any).query.reviews.findMany({
       where: eq(reviews.studentId, session.user.id),
       orderBy: desc(reviews.createdAt),
       with: {
@@ -225,7 +232,7 @@ app.post('/reviews/:id/reply', async (c) => {
   const { reply } = result.data;
 
   const review = await withRetry(() =>
-    db.query.reviews.findFirst({
+    (db as any).query.reviews.findFirst({
       where: eq(reviews.id, reviewId),
       with: {
         stall: true,
@@ -233,11 +240,11 @@ app.post('/reviews/:id/reply', async (c) => {
     })
   );
 
-  if (!review || review.stall.merchantId !== session.user.id) {
+  if (!review || (review as any).stall.merchantId !== session.user.id) {
     return c.json({ success: false, error: 'Not authorized' }, 403);
   }
 
-  const [updated] = await db
+  const [updated] = await (db as any)
     .update(reviews)
     .set({
       merchantReply: reply,

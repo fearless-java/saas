@@ -6,7 +6,7 @@ import { serializeForJson } from '@/lib/db-utils';
 
 app.get('/cafeterias', async (c) => {
   const data = await withRetry(() =>
-    db.query.cafeterias.findMany({
+    (db as any).query.cafeterias.findMany({
       orderBy: cafeterias.order,
     })
   );

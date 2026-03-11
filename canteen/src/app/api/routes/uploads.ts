@@ -1,10 +1,11 @@
 import { app } from '@/lib/hono';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { cwd } from 'process';
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(cwd(), 'uploads');
 
-app.get('/api/uploads/:filename', async (c) => {
+app.get('/uploads/:filename', async (c) => {
   const filename = c.req.param('filename');
   
   try {

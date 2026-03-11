@@ -13,7 +13,7 @@ app.get('/merchant/stall', async (c) => {
   }
 
   const stall = await withRetry(() =>
-    db.query.stalls.findFirst({
+    (db as any).query.stalls.findFirst({
       where: eq(stalls.merchantId, session.user.id),
       with: { cafeteria: true },
     })
@@ -34,7 +34,7 @@ app.get('/merchant/dishes', async (c) => {
   }
 
   const stall = await withRetry(() =>
-    db.query.stalls.findFirst({
+    (db as any).query.stalls.findFirst({
       where: eq(stalls.merchantId, session.user.id),
     })
   );
@@ -44,8 +44,8 @@ app.get('/merchant/dishes', async (c) => {
   }
 
   const dishList = await withRetry(() =>
-    db.query.dishes.findMany({
-      where: eq(dishes.stallId, stall.id),
+    (db as any).query.dishes.findMany({
+      where: eq(dishes.stallId, (stall as any).id),
       orderBy: dishes.createdAt,
     })
   );
@@ -61,7 +61,7 @@ app.get('/merchant/stats', async (c) => {
   }
 
   const stall = await withRetry(() =>
-    db.query.stalls.findFirst({
+    (db as any).query.stalls.findFirst({
       where: eq(stalls.merchantId, session.user.id),
     })
   );
@@ -74,9 +74,9 @@ app.get('/merchant/stats', async (c) => {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   const recentReviews = await withRetry(() =>
-    db.query.reviews.findMany({
+    (db as any).query.reviews.findMany({
       where: and(
-        eq(reviews.stallId, stall.id),
+        eq(reviews.stallId, (stall as any).id),
         gte(reviews.createdAt, sevenDaysAgo)
       ),
     })
@@ -88,13 +88,13 @@ app.get('/merchant/stats', async (c) => {
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
 
-    const dayReviews = recentReviews.filter((r) =>
-      r.createdAt.toISOString().startsWith(dateStr)
+    const dayReviews = (recentReviews as any[]).filter((r: any) =>
+      new Date(r.createdAt).toISOString().startsWith(dateStr)
     );
 
     const avgRating =
       dayReviews.length > 0
-        ? dayReviews.reduce((sum, r) => sum + r.rating, 0) / dayReviews.length
+        ? dayReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / dayReviews.length
         : 0;
 
     ratingTrend.push({
@@ -105,26 +105,26 @@ app.get('/merchant/stats', async (c) => {
   }
 
   const dishList = await withRetry(() =>
-    db.query.dishes.findMany({
-      where: eq(dishes.stallId, stall.id),
+    (db as any).query.dishes.findMany({
+      where: eq(dishes.stallId, (stall as any).id),
     })
   );
 
-  const dishStats = dishList
-    .map((dish) => ({
+  const dishStats = (dishList as any[])
+    .map((dish: any) => ({
       dishId: dish.id,
       name: dish.name,
       reviewCount: dish.totalReviews,
       avgRating: Number(dish.avgRating),
     }))
-    .sort((a, b) => b.reviewCount - a.reviewCount);
+    .sort((a: any, b: any) => b.reviewCount - a.reviewCount);
 
   return c.json({
     success: true,
     data: {
-      totalViews: stall.totalViews,
-      totalReviews: stall.totalReviews,
-      avgRating: Number(stall.avgRating),
+      totalViews: (stall as any).totalViews,
+      totalReviews: (stall as any).totalReviews,
+      avgRating: Number((stall as any).avgRating),
       ratingTrend,
       dishStats,
     },
@@ -139,7 +139,7 @@ app.get('/merchant/reviews', async (c) => {
   }
 
   const stall = await withRetry(() =>
-    db.query.stalls.findFirst({
+    (db as any).query.stalls.findFirst({
       where: eq(stalls.merchantId, session.user.id),
     })
   );
@@ -149,8 +149,8 @@ app.get('/merchant/reviews', async (c) => {
   }
 
   const reviewList = await withRetry(() =>
-    db.query.reviews.findMany({
-      where: eq(reviews.stallId, stall.id),
+    (db as any).query.reviews.findMany({
+      where: eq(reviews.stallId, (stall as any).id),
       orderBy: reviews.createdAt,
       with: { student: { columns: { id: true, name: true, avatar: true } } },
     })

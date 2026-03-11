@@ -13,7 +13,7 @@ app.get('/stalls', async (c) => {
   const where = cafeteriaId ? eq(stalls.cafeteriaId, cafeteriaId) : undefined;
 
   const data = await withRetry(() =>
-    db.query.stalls.findMany({
+    (db as any).query.stalls.findMany({
       where,
       orderBy: desc(stalls.totalReviews),
       with: {
@@ -36,7 +36,7 @@ app.get('/stalls/:id', async (c) => {
   const id = c.req.param('id');
 
   const stall = await withRetry(() =>
-    db.query.stalls.findFirst({
+    (db as any).query.stalls.findFirst({
       where: eq(stalls.id, id),
       with: {
         cafeteria: true,
@@ -50,13 +50,13 @@ app.get('/stalls/:id', async (c) => {
     return c.json({ success: false, error: 'Stall not found' }, 404);
   }
 
-  await db
+  await (db as any)
     .update(stalls)
-    .set({ totalViews: stall.totalViews + 1 })
+    .set({ totalViews: (stall as any).totalViews + 1 })
     .where(eq(stalls.id, id));
 
   const recentReviews = await withRetry(() =>
-    db.query.reviews.findMany({
+    (db as any).query.reviews.findMany({
       where: eq(reviews.stallId, id),
       orderBy: desc(reviews.createdAt),
       limit: 5,
@@ -92,7 +92,7 @@ app.put('/stalls/:id', async (c) => {
   const body = await c.req.json();
 
   const stall = await withRetry(() =>
-    db.query.stalls.findFirst({
+    (db as any).query.stalls.findFirst({
       where: and(eq(stalls.id, id), eq(stalls.merchantId, session.user.id)),
     })
   );
@@ -110,7 +110,7 @@ app.put('/stalls/:id', async (c) => {
 
   const updates = updateSchema.parse(body);
 
-  const [updated] = await db
+  const [updated] = await (db as any)
     .update(stalls)
     .set({ ...updates, updatedAt: new Date() })
     .where(eq(stalls.id, id))
@@ -129,7 +129,7 @@ app.get('/stalls/:id/stats', async (c) => {
   const id = c.req.param('id');
 
   const stall = await withRetry(() =>
-    db.query.stalls.findFirst({
+    (db as any).query.stalls.findFirst({
       where: and(eq(stalls.id, id), eq(stalls.merchantId, session.user.id)),
     })
   );
@@ -142,7 +142,7 @@ app.get('/stalls/:id/stats', async (c) => {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   const recentReviews = await withRetry(() =>
-    db.query.reviews.findMany({
+    (db as any).query.reviews.findMany({
       where: and(
         eq(reviews.stallId, id),
         gte(reviews.createdAt, sevenDaysAgo)
@@ -156,7 +156,7 @@ app.get('/stalls/:id/stats', async (c) => {
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
 
-    const dayReviews = recentReviews.filter((r: any) =>
+    const dayReviews = (recentReviews as any[]).filter((r: any) =>
       new Date(r.createdAt).toISOString().startsWith(dateStr)
     );
 
@@ -173,28 +173,28 @@ app.get('/stalls/:id/stats', async (c) => {
   }
 
   const dishList = await withRetry(() =>
-    db.query.dishes.findMany({
+    (db as any).query.dishes.findMany({
       where: eq(dishes.stallId, id),
     })
   );
 
   const dishStats = await Promise.all(
-    dishList.map(async (dish) => {
+    (dishList as any[]).map(async (dish) => {
       const dishReviews = await withRetry(() =>
-        db.query.reviews.findMany({
+        (db as any).query.reviews.findMany({
           where: eq(reviews.dishId, dish.id),
         })
       );
 
       const avgRating =
-        dishReviews.length > 0
-          ? dishReviews.reduce((sum, r) => sum + r.rating, 0) / dishReviews.length
+        (dishReviews as any[]).length > 0
+          ? (dishReviews as any[]).reduce((sum: number, r: any) => sum + r.rating, 0) / (dishReviews as any[]).length
           : 0;
 
       return {
         dishId: dish.id,
         name: dish.name,
-        reviewCount: dishReviews.length,
+        reviewCount: (dishReviews as any[]).length,
         avgRating: Number(avgRating.toFixed(1)),
       };
     })
@@ -203,9 +203,9 @@ app.get('/stalls/:id/stats', async (c) => {
   return c.json({
     success: true,
     data: serializeForJson({
-      totalViews: stall.totalViews,
-      totalReviews: stall.totalReviews,
-      avgRating: Number(stall.avgRating),
+      totalViews: (stall as any).totalViews,
+      totalReviews: (stall as any).totalReviews,
+      avgRating: Number((stall as any).avgRating),
       ratingTrend,
       dishStats,
     }),

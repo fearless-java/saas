@@ -14,7 +14,7 @@ app.get('/dishes', async (c) => {
   }
 
   const data = await withRetry(() =>
-    db.query.dishes.findMany({
+    (db as any).query.dishes.findMany({
       where: eq(dishes.stallId, stallId),
       orderBy: desc(dishes.totalReviews),
     })
@@ -27,7 +27,7 @@ app.get('/dishes/:id', async (c) => {
   const id = c.req.param('id');
 
   const dish = await withRetry(() =>
-    db.query.dishes.findFirst({
+    (db as any).query.dishes.findFirst({
       where: eq(dishes.id, id),
       with: {
         stall: true,
@@ -40,7 +40,7 @@ app.get('/dishes/:id', async (c) => {
   }
 
   const dishReviews = await withRetry(() =>
-    db.query.reviews.findMany({
+    (db as any).query.reviews.findMany({
       where: eq(reviews.dishId, id),
       orderBy: desc(reviews.createdAt),
       limit: 10,
@@ -97,7 +97,7 @@ app.post('/dishes', async (c) => {
   const { name, description, stallId, price, image } = result.data;
 
   const stall = await withRetry(() =>
-    db.query.stalls.findFirst({
+    (db as any).query.stalls.findFirst({
       where: and(
         eq(stalls.id, stallId),
         eq(stalls.merchantId, session.user.id)
@@ -109,7 +109,7 @@ app.post('/dishes', async (c) => {
     return c.json({ success: false, error: 'Not authorized' }, 403);
   }
 
-  const [dish] = await db
+  const [dish] = await (db as any)
     .insert(dishes)
     .values({
       name,
@@ -134,7 +134,7 @@ app.put('/dishes/:id', async (c) => {
   const body = await c.req.json();
 
   const existingDish = await withRetry(() =>
-    db.query.dishes.findFirst({
+    (db as any).query.dishes.findFirst({
       where: eq(dishes.id, id),
       with: {
         stall: true,
@@ -142,7 +142,7 @@ app.put('/dishes/:id', async (c) => {
     })
   );
 
-  if (!existingDish || existingDish.stall.merchantId !== session.user.id) {
+  if (!existingDish || (existingDish as any).stall.merchantId !== session.user.id) {
     return c.json({ success: false, error: 'Not found or not authorized' }, 403);
   }
 
@@ -166,7 +166,7 @@ app.put('/dishes/:id', async (c) => {
     );
   }
 
-  const [updated] = await db
+  const [updated] = await (db as any)
     .update(dishes)
     .set({ ...result.data, updatedAt: new Date() })
     .where(eq(dishes.id, id))
@@ -185,7 +185,7 @@ app.delete('/dishes/:id', async (c) => {
   const id = c.req.param('id');
 
   const existingDish = await withRetry(() =>
-    db.query.dishes.findFirst({
+    (db as any).query.dishes.findFirst({
       where: eq(dishes.id, id),
       with: {
         stall: true,
@@ -193,11 +193,11 @@ app.delete('/dishes/:id', async (c) => {
     })
   );
 
-  if (!existingDish || existingDish.stall.merchantId !== session.user.id) {
+  if (!existingDish || (existingDish as any).stall.merchantId !== session.user.id) {
     return c.json({ success: false, error: 'Not found or not authorized' }, 403);
   }
 
-  await db.delete(dishes).where(eq(dishes.id, id));
+  await (db as any).delete(dishes).where(eq(dishes.id, id));
 
   return c.json({ success: true, message: 'Dish deleted' });
 });

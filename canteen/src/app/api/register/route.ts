@@ -26,9 +26,12 @@ export async function POST(request: Request) {
 
     const { email, password, name, role } = result.data;
 
-    const existingUser = await db.query.users.findFirst({
-      where: eq(users.email, email),
-    });
+    const existingUser = await (db as any)
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
+      .then((rows: any[]) => rows[0]);
 
     if (existingUser) {
       return NextResponse.json(
@@ -39,7 +42,7 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const [user] = await db.insert(users).values({
+    const [user] = await (db as any).insert(users).values({
       email,
       password: hashedPassword,
       name,

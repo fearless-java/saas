@@ -14,26 +14,26 @@ app.get('/stats/my', async (c) => {
 
   const userId = session.user.id;
 
-  const [reviewCount] = await withRetry(() =>
-    db
+  const [reviewCount] = (await withRetry(() =>
+    (db as any)
       .select({ count: sql`COUNT(*)`.as('count') })
       .from(reviews)
       .where(eq(reviews.studentId, userId))
-  );
+  )) as any[];
 
-  const [favoriteCount] = await withRetry(() =>
-    db
+  const [favoriteCount] = (await withRetry(() =>
+    (db as any)
       .select({ count: sql`COUNT(*)`.as('count') })
       .from(favorites)
       .where(eq(favorites.studentId, userId))
-  );
+  )) as any[];
 
-  const [unreadMessages] = await withRetry(() =>
-    db
+  const [unreadMessages] = (await withRetry(() =>
+    (db as any)
       .select({ count: sql`COUNT(*)`.as('count') })
       .from(messages)
       .where(and(eq(messages.userId, userId), eq(messages.isRead, false)))
-  );
+  )) as any[];
 
   return c.json({
     success: true,
