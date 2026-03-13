@@ -63,35 +63,42 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-function DishListItem({ dish, index }: { dish: Dish; index: number }) {
+function DishListItem({ dish, index, stallId }: { dish: Dish; index: number; stallId: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
     >
-      <Link href={`/dishes/${dish.id}`}>
-        <div className="flex items-center justify-between py-4 border-b border-[#EEEEEE] active:bg-[#F8F8F8] transition-colors cursor-pointer">
-          <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between py-4 border-b border-[#EEEEEE] active:bg-[#F8F8F8] transition-colors cursor-pointer">
+        <Link href={`/dishes/${dish.id}`} className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-medium text-black truncate">{dish.name}</h3>
+                {!dish.isAvailable && (
+                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded">售罄</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1.5">
+                <StarRating rating={Math.round(parseFloat(dish.avgRating))} />
+                <span className="text-[13px] text-gray-500 font-medium">{dish.avgRating}</span>
+                <span className="text-gray-300">·</span>
+                <span className="text-[13px] text-gray-400">{dish.totalReviews}人推荐</span>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-medium text-black truncate">{dish.name}</h3>
-              {!dish.isAvailable && (
-                <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded">售罄</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 mt-1.5">
-              <StarRating rating={Math.round(parseFloat(dish.avgRating))} />
-              <span className="text-[13px] text-gray-500 font-medium">{dish.avgRating}</span>
-              <span className="text-gray-300">·</span>
-              <span className="text-[13px] text-gray-400">{dish.totalReviews}人推荐</span>
+              <span className="text-base font-semibold text-black">¥{dish.price}</span>
+              <ChevronRight className="w-5 h-5 text-gray-300" />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-base font-semibold text-black">¥{dish.price}</span>
-            <ChevronRight className="w-5 h-5 text-gray-300" />
-          </div>
-        </div>
-      </Link>
+        </Link>
+        <Link href={`/reviews/new?stallId=${stallId}&dishId=${dish.id}`} className="ml-2">
+          <button className="px-3 py-1.5 bg-[#D97706] text-white text-xs font-medium rounded-full hover:bg-[#B45309] transition-colors whitespace-nowrap">
+            评价
+          </button>
+        </Link>
+      </div>
     </motion.div>
   );
 }
@@ -245,7 +252,7 @@ export default function StallDetailPage() {
           ) : (
             <div>
               {stall.dishes?.map((dish, index) => (
-                <DishListItem key={dish.id} dish={dish} index={index} />
+                <DishListItem key={dish.id} dish={dish} index={index} stallId={stall.id} />
               ))}
             </div>
           )}

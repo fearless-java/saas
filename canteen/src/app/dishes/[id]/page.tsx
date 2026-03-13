@@ -188,6 +188,12 @@ export default function DishDetailPage() {
               <h2 className="text-lg font-bold text-black">用户评价</h2>
               <span className="text-sm text-gray-400">({dish.totalReviews})</span>
             </div>
+
+            <Link href={`/reviews/new?stallId=${dish.stall.id}&dishId=${dish.id}`}>
+              <button className="px-4 py-2 bg-[#D97706] text-white text-sm font-medium rounded-full hover:bg-[#B45309] transition-colors">
+                写评价
+              </button>
+            </Link>
           </div>
 
           {dish.reviews?.length === 0 ? (

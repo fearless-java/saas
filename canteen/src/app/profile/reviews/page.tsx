@@ -20,6 +20,10 @@ interface Review {
     id: string;
     name: string;
   };
+  dish?: {
+    id: string;
+    name: string;
+  };
 }
 
 function StarRating({ rating }: { rating: number }) {
@@ -57,12 +61,17 @@ function ReviewItem({ review, index }: { review: Review; index: number }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
     >
-      <Link href={`/stalls/${review.stall.id}`}>
+      <Link href={review.dish ? `/dishes/${review.dish.id}` : `/stalls/${review.stall.id}`}>
         <div className="py-4 border-b border-[#EEEEEE] active:bg-[#F8F8F8] transition-colors">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-base font-medium text-black">{review.stall.name}</span>
-              <ChevronRight className="w-4 h-4 text-gray-300" />
+              {review.dish && (
+                <>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                  <span className="text-sm text-[#D97706]">{review.dish.name}</span>
+                </>
+              )}
             </div>
           </div>
           
