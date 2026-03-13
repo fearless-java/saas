@@ -1,5 +1,5 @@
 import { app } from '@/lib/hono';
-import { db } from '@/db';
+import { db, executeSQL } from '@/db';
 import { stalls, dishes, reviews } from '@/db/schema';
 import { eq, desc, and, gte } from 'drizzle-orm';
 import { z } from 'zod';
@@ -109,12 +109,41 @@ app.put('/stalls/:id', async (c) => {
   });
 
   const updates = updateSchema.parse(body);
+  const now = Date.now();
 
+  // 构建更新 SQL
+  const setClauses = ['updated_at = ?'];
+  const params: any[] = [now];
+
+  if (updates.name !== undefined) {
+    setClauses.push('name = ?');
+    params.push(updates.name);
+  }
+  if (updates.description !== undefined) {
+    setClauses.push('description = ?');
+    params.push(updates.description);
+  }
+  if (updates.image !== undefined) {
+    setClauses.push('image = ?');
+    params.push(updates.image);
+  }
+  if (updates.isActive !== undefined) {
+    setClauses.push('is_active = ?');
+    params.push(updates.isActive ? 1 : 0);
+  }
+
+  params.push(id);
+
+  await executeSQL(
+    `UPDATE stalls SET ${setClauses.join(', ')} WHERE id = ?`,
+    params
+  );
+
+  // 获取更新后的数据
   const [updated] = await (db as any)
-    .update(stalls)
-    .set({ ...updates, updatedAt: new Date() })
-    .where(eq(stalls.id, id))
-    .returning();
+    .select()
+    .from(stalls)
+    .where(eq(stalls.id, id));
 
   return c.json({ success: true, data: serializeForJson(updated) });
 });

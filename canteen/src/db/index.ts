@@ -34,6 +34,21 @@ function createSQLiteConnection() {
   const dbPath = process.env.LOCAL_DB_PATH || resolve(process.cwd(), 'data/local.db');
   const sqlite = new Database(dbPath);
   sqlite.exec('PRAGMA foreign_keys = ON;');
+
+  // 添加 UUID 函数支持
+  sqlite.function('gen_random_uuid', () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  });
+
+  // 添加 now() 函数支持
+  sqlite.function('now', () => {
+    return new Date().toISOString();
+  });
+
   return drizzleBetterSqlite3(sqlite, { schema: sqliteSchema });
 }
 
@@ -42,5 +57,23 @@ type DatabaseType = NeonHttpDatabase<typeof pgSchema> | BetterSQLite3Database<ty
 export const db: DatabaseType = isLocalDB 
   ? createSQLiteConnection() 
   : createNeonConnection();
+
+// 原生 SQL 执行函数 (用于 SQLite 插入/更新/删除操作)
+export async function executeSQL(sql: string, params: any[] = []) {
+  const sqlite = new Database(process.env.LOCAL_DB_PATH || resolve(process.cwd(), 'data/local.db'));
+  const stmt = sqlite.prepare(sql);
+  const result = stmt.run(...params);
+  sqlite.close();
+  return result;
+}
+
+// 原生 SQL 查询函数 (用于 SQLite SELECT 查询)
+export async function querySQL(sql: string, params: any[] = []) {
+  const sqlite = new Database(process.env.LOCAL_DB_PATH || resolve(process.cwd(), 'data/local.db'));
+  const stmt = sqlite.prepare(sql);
+  const results = stmt.all(...params);
+  sqlite.close();
+  return results;
+}
 
 export { pgSchema, sqliteSchema };

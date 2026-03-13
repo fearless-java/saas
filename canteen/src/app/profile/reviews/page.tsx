@@ -39,9 +39,17 @@ function StarRating({ rating }: { rating: number }) {
 
 function ReviewItem({ review, index }: { review: Review; index: number }) {
   // Handle SQLite JSON string vs PostgreSQL array
-  const images = typeof review.images === 'string' 
-    ? JSON.parse(review.images) 
-    : review.images || [];
+  let images: string[] = [];
+  if (typeof review.images === 'string') {
+    try {
+      images = JSON.parse(review.images);
+    } catch (e) {
+      // 如果解析失败，尝试作为单张图片处理或返回空数组
+      images = review.images && review.images.length > 2 ? [review.images] : [];
+    }
+  } else if (Array.isArray(review.images)) {
+    images = review.images;
+  }
   
   return (
     <motion.div

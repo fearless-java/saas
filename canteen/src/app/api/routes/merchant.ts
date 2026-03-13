@@ -1,9 +1,10 @@
 import { app } from '@/lib/hono';
-import { db } from '@/db';
+import { db, sqliteSchema } from '@/db';
 import { stalls, reviews, dishes } from '@/db/schema';
 import { eq, and, gte } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { withRetry } from '@/lib/retry';
+import { serializeForJson } from '@/lib/db-utils';
 
 app.get('/merchant/stall', async (c) => {
   const session = await auth();
@@ -12,18 +13,26 @@ app.get('/merchant/stall', async (c) => {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
-  const stall = await withRetry(() =>
-    (db as any).query.stalls.findFirst({
-      where: eq(stalls.merchantId, session.user.id),
-      with: { cafeteria: true },
-    })
-  );
+  const merchantId = session.user.id as string;
+  
+  let stallList;
+  try {
+    stallList = await (db as any).select().from(sqliteSchema.stalls).where(eq(sqliteSchema.stalls.merchantId, merchantId));
+  } catch (e) {
+    console.error('Query error:', e);
+    return c.json({ success: false, error: 'Query failed' }, 500);
+  }
+
+  const stall = stallList[0];
 
   if (!stall) {
     return c.json({ success: false, error: 'No stall found' }, 404);
   }
 
-  return c.json({ success: true, data: stall });
+  // 获取食堂信息
+  const cafeteriaList = await (db as any).select().from(sqliteSchema.cafeterias).where(eq(sqliteSchema.cafeterias.id, stall.cafeteriaId));
+
+  return c.json({ success: true, data: serializeForJson({ ...stall, cafeteria: cafeteriaList[0] }) });
 });
 
 app.get('/merchant/dishes', async (c) => {
@@ -50,7 +59,7 @@ app.get('/merchant/dishes', async (c) => {
     })
   );
 
-  return c.json({ success: true, data: dishList });
+  return c.json({ success: true, data: serializeForJson(dishList) });
 });
 
 app.get('/merchant/stats', async (c) => {

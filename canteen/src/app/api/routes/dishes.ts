@@ -1,7 +1,8 @@
 import { app } from '@/lib/hono';
-import { db } from '@/db';
+import { db, executeSQL, querySQL } from '@/db';
+import { serializeForJson } from '@/lib/db-utils';
 import { dishes, stalls, reviews } from '@/db/schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { withRetry } from '@/lib/retry';
@@ -26,12 +27,9 @@ app.get('/dishes', async (c) => {
 app.get('/dishes/:id', async (c) => {
   const id = c.req.param('id');
 
-  const dish = await withRetry(() =>
+  const dish: any = await withRetry(() =>
     (db as any).query.dishes.findFirst({
       where: eq(dishes.id, id),
-      with: {
-        stall: true,
-      },
     })
   );
 
@@ -39,20 +37,18 @@ app.get('/dishes/:id', async (c) => {
     return c.json({ success: false, error: 'Dish not found' }, 404);
   }
 
+  // 获取档口信息
+  const stall: any = await withRetry(() =>
+    (db as any).query.stalls.findFirst({
+      where: eq(stalls.id, dish.stallId),
+    })
+  );
+
   const dishReviews = await withRetry(() =>
     (db as any).query.reviews.findMany({
       where: eq(reviews.dishId, id),
       orderBy: desc(reviews.createdAt),
       limit: 10,
-      with: {
-        student: {
-          columns: {
-            id: true,
-            name: true,
-            avatar: true,
-          },
-        },
-      },
     })
   );
 
@@ -60,6 +56,7 @@ app.get('/dishes/:id', async (c) => {
     success: true,
     data: {
       ...dish,
+      stall,
       reviews: dishReviews,
     },
   });
@@ -96,31 +93,32 @@ app.post('/dishes', async (c) => {
 
   const { name, description, stallId, price, image } = result.data;
 
-  const stall = await withRetry(() =>
-    (db as any).query.stalls.findFirst({
-      where: and(
-        eq(stalls.id, stallId),
-        eq(stalls.merchantId, session.user.id)
-      ),
-    })
+  // 使用原生 SQL 验证商家权限
+  const stalls_result = await querySQL(
+    'SELECT id FROM stalls WHERE id = ? AND merchant_id = ?',
+    [stallId, session.user.id]
   );
 
-  if (!stall) {
+  if (!stalls_result || stalls_result.length === 0) {
     return c.json({ success: false, error: 'Not authorized' }, 403);
   }
 
-  const [dish] = await (db as any)
-    .insert(dishes)
-    .values({
-      name,
-      description,
-      stallId,
-      price,
-      image,
-    })
-    .returning();
+  const now = Date.now();
+  const id = crypto.randomUUID();
 
-  return c.json({ success: true, data: dish }, 201);
+  // 使用原生 SQL 插入
+  await executeSQL(
+    'INSERT INTO dishes (id, name, description, stall_id, price, image, is_available, avg_rating, total_reviews, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, 0, 0, ?, ?)',
+    [id, name, description || null, stallId, price, image || null, now, now]
+  );
+
+  // 获取刚插入的数据
+  const dish_result = await querySQL(
+    'SELECT * FROM dishes WHERE id = ?',
+    [id]
+  );
+
+  return c.json({ success: true, data: serializeForJson(dish_result[0]) }, 201);
 });
 
 app.put('/dishes/:id', async (c) => {
@@ -133,17 +131,21 @@ app.put('/dishes/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
 
-  const existingDish = await withRetry(() =>
-    (db as any).query.dishes.findFirst({
-      where: eq(dishes.id, id),
-      with: {
-        stall: true,
-      },
-    })
+  // 使用原生 SQL 查询菜品并验证商家权限
+  const existingDish: any[] = await querySQL(
+    `SELECT d.*, s.merchant_id as stall_merchant_id
+     FROM dishes d
+     JOIN stalls s ON d.stall_id = s.id
+     WHERE d.id = ?`,
+    [id]
   );
 
-  if (!existingDish || (existingDish as any).stall.merchantId !== session.user.id) {
-    return c.json({ success: false, error: 'Not found or not authorized' }, 403);
+  if (!existingDish || existingDish.length === 0) {
+    return c.json({ success: false, error: 'Dish not found' }, 404);
+  }
+
+  if (existingDish[0].stall_merchant_id !== session.user.id) {
+    return c.json({ success: false, error: 'Not authorized' }, 403);
   }
 
   const updateSchema = z.object({
@@ -166,13 +168,52 @@ app.put('/dishes/:id', async (c) => {
     );
   }
 
-  const [updated] = await (db as any)
-    .update(dishes)
-    .set({ ...result.data, updatedAt: new Date() })
-    .where(eq(dishes.id, id))
-    .returning();
+  // 构建更新字段
+  const updateFields: string[] = [];
+  const updateValues: any[] = [];
 
-  return c.json({ success: true, data: updated });
+  if (result.data.name !== undefined) {
+    updateFields.push('name = ?');
+    updateValues.push(result.data.name);
+  }
+  if (result.data.description !== undefined) {
+    updateFields.push('description = ?');
+    updateValues.push(result.data.description);
+  }
+  if (result.data.price !== undefined) {
+    updateFields.push('price = ?');
+    updateValues.push(result.data.price);
+  }
+  if (result.data.image !== undefined) {
+    updateFields.push('image = ?');
+    updateValues.push(result.data.image);
+  }
+  if (result.data.isAvailable !== undefined) {
+    updateFields.push('is_available = ?');
+    updateValues.push(result.data.isAvailable ? 1 : 0);
+  }
+
+  if (updateFields.length === 0) {
+    return c.json({ success: false, error: 'No fields to update' }, 400);
+  }
+
+  updateFields.push('updated_at = ?');
+  updateValues.push(Date.now());
+  updateValues.push(id);
+
+  // 执行更新
+  await executeSQL(
+    `UPDATE dishes SET ${updateFields.join(', ')} WHERE id = ?`,
+    updateValues
+  );
+
+  // 获取更新后的数据
+  const updated_result: any[] = await querySQL(
+    'SELECT * FROM dishes WHERE id = ?',
+    [id]
+  );
+
+  return c.json({ success: true, data: serializeForJson(updated_result[0]) });
 });
 
 app.delete('/dishes/:id', async (c) => {
@@ -184,20 +225,24 @@ app.delete('/dishes/:id', async (c) => {
 
   const id = c.req.param('id');
 
-  const existingDish = await withRetry(() =>
-    (db as any).query.dishes.findFirst({
-      where: eq(dishes.id, id),
-      with: {
-        stall: true,
-      },
-    })
+  // 使用原生 SQL 查询菜品并验证商家权限
+  const existingDish: any[] = await querySQL(
+    `SELECT d.*, s.merchant_id as stall_merchant_id
+     FROM dishes d
+     JOIN stalls s ON d.stall_id = s.id
+     WHERE d.id = ?`,
+    [id]
   );
 
-  if (!existingDish || (existingDish as any).stall.merchantId !== session.user.id) {
-    return c.json({ success: false, error: 'Not found or not authorized' }, 403);
+  if (!existingDish || existingDish.length === 0) {
+    return c.json({ success: false, error: 'Dish not found' }, 404);
   }
 
-  await (db as any).delete(dishes).where(eq(dishes.id, id));
+  if (existingDish[0].stall_merchant_id !== session.user.id) {
+    return c.json({ success: false, error: 'Not authorized' }, 403);
+  }
+
+  await executeSQL('DELETE FROM dishes WHERE id = ?', [id]);
 
   return c.json({ success: true, message: 'Dish deleted' });
 });

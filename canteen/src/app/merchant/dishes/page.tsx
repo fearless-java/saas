@@ -25,6 +25,11 @@ interface Dish {
   totalReviews: number;
 }
 
+interface Stall {
+  id: string;
+  name: string;
+}
+
 export default function MerchantDishesPage() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -35,6 +40,16 @@ export default function MerchantDishesPage() {
     price: '',
     image: '',
     isAvailable: true,
+  });
+
+  // 获取商家档口信息
+  const { data: stall } = useQuery<Stall>({
+    queryKey: ['merchant', 'stall'],
+    queryFn: async () => {
+      const res = await fetch('/api/merchant/stall');
+      const json = await res.json();
+      return json.data;
+    },
   });
 
   const { data: dishes, isLoading } = useQuery<Dish[]>({
@@ -48,17 +63,30 @@ export default function MerchantDishesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      if (!stall?.id) {
+        throw new Error('档口信息加载中');
+      }
       const res = await fetch('/api/dishes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          stallId: stall.id,
+        }),
       });
-      return res.json();
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || '创建失败');
+      }
+      return json;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['merchant', 'dishes'] });
       setIsDialogOpen(false);
       resetForm();
+    },
+    onError: (error: Error) => {
+      alert(error.message);
     },
   });
 
@@ -67,15 +95,28 @@ export default function MerchantDishesPage() {
       const res = await fetch(`/api/dishes/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description,
+          price: data.price,
+          image: data.image,
+          isAvailable: data.isAvailable,
+        }),
       });
-      return res.json();
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || '更新失败');
+      }
+      return json;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['merchant', 'dishes'] });
       setIsDialogOpen(false);
       setEditingDish(null);
       resetForm();
+    },
+    onError: (error: Error) => {
+      alert(error.message);
     },
   });
 
@@ -105,7 +146,7 @@ export default function MerchantDishesPage() {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (editingDish) {
       updateMutation.mutate({ id: editingDish.id, data: formData });
     } else {
@@ -113,9 +154,18 @@ export default function MerchantDishesPage() {
     }
   };
 
-  if (isLoading) {
+  const handleDialogChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      setEditingDish(null);
+      resetForm();
+    }
+  };
+
+  if (isLoading || !stall) {
     return (
       <div className="space-y-4">
+        <Skeleton className="h-10 w-24" />
         {[1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-24 rounded-lg" />
         ))}
@@ -127,19 +177,19 @@ export default function MerchantDishesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">菜品列表</h2>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>
             <Button size="sm">
               <Plus className="h-4 w-4 mr-1" />
               添加菜品
             </Button>
           </DialogTrigger>
-          
+
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingDish ? '编辑菜品' : '添加菜品'}</DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-4 mt-4">
               <div>
                 <Label>菜品名称</Label>
@@ -149,7 +199,7 @@ export default function MerchantDishesPage() {
                   placeholder="菜品名称"
                 />
               </div>
-              
+
               <div>
                 <Label>价格</Label>
                 <Input
@@ -158,7 +208,7 @@ export default function MerchantDishesPage() {
                   placeholder="例如: 18.00"
                 />
               </div>
-              
+
               <div>
                 <Label>介绍</Label>
                 <Textarea
@@ -168,23 +218,23 @@ export default function MerchantDishesPage() {
                   rows={2}
                 />
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Switch
                   checked={formData.isAvailable}
-                  onCheckedChange={(checked: boolean) => 
+                  onCheckedChange={(checked: boolean) =>
                     setFormData({ ...formData, isAvailable: checked })
                   }
                 />
                 <Label>在售</Label>
               </div>
-              
-              <Button 
-                className="w-full" 
+
+              <Button
+                className="w-full"
                 onClick={handleSubmit}
-                disabled={!formData.name || !formData.price}
+                disabled={!formData.name || !formData.price || createMutation.isPending || updateMutation.isPending}
               >
-                {editingDish ? '保存修改' : '添加菜品'}
+                {createMutation.isPending || updateMutation.isPending ? '处理中...' : editingDish ? '保存修改' : '添加菜品'}
               </Button>
             </div>
           </DialogContent>
@@ -215,25 +265,25 @@ export default function MerchantDishesPage() {
                           <Badge variant="secondary">售罄</Badge>
                         )}
                       </div>
-                      
+
                       {dish.description && (
                         <p className="text-sm text-gray-500 mt-1">{dish.description}</p>
                       )}
-                      
+
                       <div className="flex items-center gap-4 mt-2 text-sm">
                         <span className="text-red-500 font-bold">¥{dish.price}</span>
                         <span className="text-gray-500">{dish.totalReviews} 评价</span>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(dish)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => deleteMutation.mutate(dish.id)}
                         disabled={deleteMutation.isPending}
                       >

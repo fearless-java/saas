@@ -8,8 +8,8 @@ export const users = sqliteTable('users', {
   role: text('role').notNull(),
   name: text('name').notNull(),
   avatar: text('avatar'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 });
 
 export const cafeterias = sqliteTable('cafeterias', {
@@ -32,8 +32,8 @@ export const stalls = sqliteTable('stalls', {
   totalReviews: integer('total_reviews').default(0).notNull(),
   totalViews: integer('total_views').default(0).notNull(),
   isActive: integer('is_active', { mode: 'boolean' }).default(true).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 });
 
 export const dishes = sqliteTable('dishes', {
@@ -46,8 +46,8 @@ export const dishes = sqliteTable('dishes', {
   isAvailable: integer('is_available', { mode: 'boolean' }).default(true).notNull(),
   avgRating: text('avg_rating').default('0').notNull(),
   totalReviews: integer('total_reviews').default(0).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 });
 
 export const reviews = sqliteTable('reviews', {
@@ -60,22 +60,22 @@ export const reviews = sqliteTable('reviews', {
   images: text('images').default('[]').notNull(),
   likes: integer('likes').default(0).notNull(),
   merchantReply: text('merchant_reply'),
-  repliedAt: integer('replied_at', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  repliedAt: integer('replied_at'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 });
 
 export const reviewLikes = sqliteTable('review_likes', {
   reviewId: text('review_id').notNull(),
   studentId: text('student_id').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at').notNull(),
 }, (table) => [primaryKey({ columns: [table.reviewId, table.studentId] })]);
 
 export const favorites = sqliteTable('favorites', {
   id: text('id').primaryKey(),
   studentId: text('student_id').notNull(),
   stallId: text('stall_id').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at').notNull(),
 });
 
 export const messages = sqliteTable('messages', {
@@ -85,7 +85,7 @@ export const messages = sqliteTable('messages', {
   title: text('title').notNull(),
   content: text('content').notNull(),
   isRead: integer('is_read', { mode: 'boolean' }).default(false).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at').notNull(),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({

@@ -26,6 +26,7 @@ export default function LoginPage() {
       email: formData.email,
       password: formData.password,
       redirect: false,
+      callbackUrl: '/',
     });
 
     if (result?.error) {
@@ -36,7 +37,7 @@ export default function LoginPage() {
 
     localStorage.setItem('skipLanding', 'true');
     document.cookie = 'skipLanding=true; path=/; max-age=31536000';
-    
+
     router.push('/');
     router.refresh();
   }
