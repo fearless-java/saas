@@ -49,16 +49,25 @@ app.get('/dishes/:id', async (c) => {
       where: eq(reviews.dishId, id),
       orderBy: desc(reviews.createdAt),
       limit: 10,
+      with: {
+        student: {
+          columns: {
+            id: true,
+            name: true,
+            avatar: true,
+          },
+        },
+      },
     })
   );
 
   return c.json({
     success: true,
-    data: {
+    data: serializeForJson({
       ...dish,
       stall,
       reviews: dishReviews,
-    },
+    }),
   });
 });
 
